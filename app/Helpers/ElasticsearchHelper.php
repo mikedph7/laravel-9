@@ -2,23 +2,66 @@
 
 namespace App\Helpers;
 
-use App\Models\Email;
 use App\Utilities\Contracts\ElasticsearchHelperInterface;
+use Elasticsearch\Client;
+use Elasticsearch\ClientBuilder;
+use Elasticsearch\Common\Exceptions\Missing404Exception;
+use Exception;
 
 class ElasticsearchHelper implements ElasticsearchHelperInterface
 {
-    public function store(array $data)
+    protected Client $clientBuilder;
+    protected const PARAMS = [
+            'type' => 'doc',
+            'index' => 'emails',
+        ];
+
+    public function __construct()
     {
-        $email = new Email();
-        $email->data = json_encode($data);
-        if ($res = $email->saveToIndex()) {
-            return $res['_id'];
-        }
-        return false;
+        $this->clientBuilder = ClientBuilder::create()->build();
     }
 
-    public function retrieve(string $key)
+    public function store(array $data)
     {
-        // TODO: Implement retrieve() method.
+        try {
+            $params = array_merge(self::PARAMS, [
+                'body' => [
+                    'data' => $data,
+                ]
+            ]);
+
+            $response = $this->clientBuilder->index($params);
+
+            if (!$response['created']) {
+                return false;
+            }
+            return $response['_id'];
+        } catch (Exception $e) {
+            Logger::log($e);
+            return false;
+        }
+
+    }
+
+    public function retrieve(string $key): array
+    {
+        try {
+            $emails = [];
+            $params = self::PARAMS;
+            $params['index'] = $key;
+            $response = $this->clientBuilder->search($params);
+
+            $hits = $response['hits']['hits'];
+
+            foreach ($hits as $hit) {
+                $source = $hit['_source'];
+                $emails[] = ['id' => $hit['_id']] + $source['data'];
+            }
+            return $emails;
+
+        } catch (Missing404Exception $e) {
+            Logger::log($e);
+            return [];
+        }
     }
 }

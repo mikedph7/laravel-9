@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Helpers\ElasticsearchHelper;
 use App\Helpers\RedisHelper;
 use App\Http\Requests\EmailRequest;
-use App\Models\Email;
 use App\Services\EmailService;
+use Illuminate\Http\JsonResponse;
 
 class EmailController extends Controller
 {
@@ -25,23 +25,29 @@ class EmailController extends Controller
         $this->elasticsearchHelper = $elasticsearchHelper;
     }
 
-    // TODO: finish implementing send method
-    public function send(EmailRequest $request)
+    public function send(EmailRequest $request): JsonResponse
     {
         $params = $request->get('data');
+        $success = 0;
 
         foreach ($params as $param) {
-            $id = $this->elasticsearchHelper->store($param);
-            $this->redisHelper->store($id, $param);
-            $this->emailService->send($param);
+            if ($id = $this->elasticsearchHelper->store($param)) {
+                $this->redisHelper->store($id, $param);
+                $this->emailService->send($param);
+                ++$success;
+            }
         }
 
+        return response()->json([
+            'email_count' => count($params),
+            'success_count' => $success,
+        ]);
     }
 
-    //  TODO - BONUS: implement list method
     public function list()
     {
-        // TODO impelement search in laravel/scout
-        $email = Email::search('*')->get();
+        return response()->json([
+            'emails' => $this->elasticsearchHelper->retrieve('emails')
+        ]);
     }
 }
