@@ -14,6 +14,8 @@ class EmailController extends Controller
     protected RedisHelper $redisHelper;
     protected ElasticsearchHelper $elasticsearchHelper;
 
+    const EMAILS_INDEX = 'emails';
+
     public function __construct(
         EmailService $emailService,
         RedisHelper $redisHelper,
@@ -25,13 +27,17 @@ class EmailController extends Controller
         $this->elasticsearchHelper = $elasticsearchHelper;
     }
 
+    /**
+     * @param EmailRequest $request
+     * @return JsonResponse
+     */
     public function send(EmailRequest $request): JsonResponse
     {
         $params = $request->get('data');
         $success = 0;
 
         foreach ($params as $param) {
-            if ($id = $this->elasticsearchHelper->store($param)) {
+            if ($id = $this->elasticsearchHelper->store(self::EMAILS_INDEX, $param)) {
                 $this->redisHelper->store($id, $param);
                 $this->emailService->send($param);
                 ++$success;
@@ -44,10 +50,13 @@ class EmailController extends Controller
         ]);
     }
 
-    public function list()
+    /**
+     * @return JsonResponse
+     */
+    public function list(): JsonResponse
     {
         return response()->json([
-            'emails' => $this->elasticsearchHelper->retrieve('emails')
+            'emails' => $this->elasticsearchHelper->retrieve(self::EMAILS_INDEX)
         ]);
     }
 }

@@ -13,7 +13,6 @@ class ElasticsearchHelper implements ElasticsearchHelperInterface
     protected Client $clientBuilder;
     protected const PARAMS = [
             'type' => 'doc',
-            'index' => 'emails',
         ];
 
     public function __construct()
@@ -21,10 +20,11 @@ class ElasticsearchHelper implements ElasticsearchHelperInterface
         $this->clientBuilder = ClientBuilder::create()->build();
     }
 
-    public function store(array $data)
+    public function store(string $index, array $data)
     {
         try {
             $params = array_merge(self::PARAMS, [
+                'index' => $index,
                 'body' => [
                     'data' => $data,
                 ]
